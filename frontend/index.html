@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coolify Monitor</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f3f1eb;
+      --bg-accent: radial-gradient(circle at top left, rgba(214, 159, 76, 0.22), transparent 30%), linear-gradient(180deg, #faf8f3 0%, #ece7dc 100%);
+      --surface: rgba(255, 252, 246, 0.82);
+      --surface-strong: #fff9ef;
+      --border: rgba(91, 76, 54, 0.12);
+      --text: #221b14;
+      --muted: #756654;
+      --good: #17824c;
+      --warn: #d68a17;
+      --bad: #ca4432;
+      --neutral: #8f8578;
+      --bar-track: rgba(60, 48, 36, 0.1);
+      --bar-fill: linear-gradient(90deg, #db7d26 0%, #ebae46 100%);
+      --shadow: 0 18px 50px rgba(76, 55, 25, 0.08);
+      --font-display: "Avenir Next", "Segoe UI", sans-serif;
+      --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #161412;
+        --bg-accent: radial-gradient(circle at top left, rgba(237, 182, 89, 0.16), transparent 28%), linear-gradient(180deg, #171411 0%, #0f0d0b 100%);
+        --surface: rgba(29, 24, 20, 0.82);
+        --surface-strong: #221c17;
+        --border: rgba(243, 231, 213, 0.08);
+        --text: #f3e7d5;
+        --muted: #b8aa97;
+        --good: #49c87e;
+        --warn: #ffbf59;
+        --bad: #ff7560;
+        --neutral: #8d8478;
+        --bar-track: rgba(255, 245, 231, 0.08);
+        --bar-fill: linear-gradient(90deg, #d88228 0%, #f0c05e 100%);
+        --shadow: 0 18px 50px rgba(0, 0, 0, 0.26);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg-accent);
+      color: var(--text);
+      font-family: var(--font-body);
+    }
+
+    .shell {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 28px 18px 40px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .headline {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 3.8rem);
+      line-height: 0.94;
+      font-family: var(--font-display);
+      font-weight: 700;
+    }
+
+    .meta {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(14px);
+      border-radius: 22px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .card {
+      padding: 18px;
+      min-height: 158px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .card-label {
+      font-size: 0.82rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .metric-value {
+      font-size: clamp(1.7rem, 3.2vw, 2.8rem);
+      line-height: 1;
+      font-weight: 700;
+      margin: 6px 0 8px;
+    }
+
+    .metric-sub {
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    .bar {
+      height: 10px;
+      width: 100%;
+      border-radius: 999px;
+      overflow: hidden;
+      background: var(--bar-track);
+      margin-top: 14px;
+    }
+
+    .bar > span {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: var(--bar-fill);
+      border-radius: inherit;
+      transition: width 250ms ease;
+    }
+
+    .summary {
+      padding: 16px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .summary-main {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .summary-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .summary-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .summary-breakdown {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: 0.93rem;
+    }
+
+    .table-panel {
+      padding: 18px;
+    }
+
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .table-header h2 {
+      margin: 0;
+      font-size: 1.15rem;
+    }
+
+    .filter-wrap input {
+      width: min(340px, 70vw);
+      border: 1px solid var(--border);
+      background: var(--surface-strong);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 11px 14px;
+      font: inherit;
+      outline: none;
+    }
+
+    .table-scroller {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      min-width: 920px;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 14px 12px;
+      vertical-align: top;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.94rem;
+    }
+
+    th {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 0.75rem;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    tbody tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .name-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      min-width: 220px;
+    }
+
+    .name-main {
+      font-weight: 600;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .name-sub {
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--neutral);
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04);
+    }
+
+    .dot.running { background: var(--good); }
+    .dot.exited { background: var(--bad); }
+    .dot.paused { background: var(--warn); }
+    .dot.created, .dot.dead, .dot.unknown { background: var(--neutral); }
+
+    .mini-metric {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 150px;
+    }
+
+    .mini-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 0.72rem;
+      background: rgba(255, 201, 117, 0.15);
+      color: var(--warn);
+      border: 1px solid rgba(255, 201, 117, 0.22);
+    }
+
+    .link {
+      color: inherit;
+      text-decoration-color: rgba(214, 138, 23, 0.45);
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 20px 8px 6px;
+    }
+
+    .pulse {
+      display: inline-flex;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--good);
+      box-shadow: 0 0 0 0 rgba(73, 200, 126, 0.55);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(73, 200, 126, 0.55); }
+      70% { box-shadow: 0 0 0 10px rgba(73, 200, 126, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(73, 200, 126, 0); }
+    }
+
+    @media (max-width: 980px) {
+      .cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .shell {
+        padding: 18px 12px 28px;
+      }
+
+      .cards {
+        grid-template-columns: 1fr;
+      }
+
+      .summary {
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="topbar">
+      <div class="headline">
+        <div class="eyebrow">Host + Docker + Coolify</div>
+        <h1>Coolify Monitor</h1>
+      </div>
+      <div class="meta">
+        <span class="pulse" aria-hidden="true"></span>
+        <span id="connection-state">Connecting…</span>
+        <span id="last-updated">Last: --</span>
+      </div>
+    </section>
+
+    <section class="cards">
+      <article class="panel card">
+        <div>
+          <div class="card-label">CPU</div>
+          <div class="metric-value" id="cpu-value">--</div>
+          <div class="metric-sub" id="cpu-sub">Waiting for data</div>
+        </div>
+        <div class="bar"><span id="cpu-bar"></span></div>
+      </article>
+      <article class="panel card">
+        <div>
+          <div class="card-label">Memory</div>
+          <div class="metric-value" id="memory-value">--</div>
+          <div class="metric-sub" id="memory-sub">Waiting for data</div>
+        </div>
+        <div class="bar"><span id="memory-bar"></span></div>
+      </article>
+      <article class="panel card">
+        <div>
+          <div class="card-label">Disk</div>
+          <div class="metric-value" id="disk-value">--</div>
+          <div class="metric-sub" id="disk-sub">Waiting for data</div>
+        </div>
+        <div class="bar"><span id="disk-bar"></span></div>
+      </article>
+      <article class="panel card">
+        <div>
+          <div class="card-label">Load</div>
+          <div class="metric-value" id="load-value">--</div>
+          <div class="metric-sub" id="load-sub">Waiting for data</div>
+        </div>
+        <div class="bar"><span id="load-bar"></span></div>
+      </article>
+    </section>
+
+    <section class="panel summary">
+      <div class="summary-main">
+        <div class="summary-label">Docker Disk</div>
+        <div class="summary-value" id="docker-total">--</div>
+      </div>
+      <div class="summary-breakdown">
+        <span id="docker-images">Images: --</span>
+        <span id="docker-volumes">Volumes: --</span>
+        <span id="docker-containers">Containers: --</span>
+        <span id="docker-build-cache">Build cache: --</span>
+      </div>
+    </section>
+
+    <section class="panel table-panel">
+      <div class="table-header">
+        <h2>Containers</h2>
+        <label class="filter-wrap">
+          <input id="filter-input" type="text" placeholder="Filter by name, project, environment, or domain">
+        </label>
+      </div>
+      <div class="table-scroller">
+        <table>
+          <thead>
+            <tr>
+              <th data-sort="name">Name</th>
+              <th data-sort="status">Status</th>
+              <th data-sort="cpu">CPU</th>
+              <th data-sort="memory">Memory</th>
+              <th data-sort="disk">Disk</th>
+              <th data-sort="fqdn">FQDN</th>
+              <th data-sort="uptime">Uptime</th>
+            </tr>
+          </thead>
+          <tbody id="container-body"></tbody>
+        </table>
+      </div>
+      <div id="empty-state" class="empty" hidden>No containers match the current filter.</div>
+    </section>
+  </main>
+
+  <script>
+    const state = {
+      snapshot: null,
+      filter: "",
+      sortKey: "cpu",
+      sortDirection: "desc"
+    };
+
+    const els = {
+      connectionState: document.getElementById("connection-state"),
+      lastUpdated: document.getElementById("last-updated"),
+      cpuValue: document.getElementById("cpu-value"),
+      cpuSub: document.getElementById("cpu-sub"),
+      cpuBar: document.getElementById("cpu-bar"),
+      memoryValue: document.getElementById("memory-value"),
+      memorySub: document.getElementById("memory-sub"),
+      memoryBar: document.getElementById("memory-bar"),
+      diskValue: document.getElementById("disk-value"),
+      diskSub: document.getElementById("disk-sub"),
+      diskBar: document.getElementById("disk-bar"),
+      loadValue: document.getElementById("load-value"),
+      loadSub: document.getElementById("load-sub"),
+      loadBar: document.getElementById("load-bar"),
+      dockerTotal: document.getElementById("docker-total"),
+      dockerImages: document.getElementById("docker-images"),
+      dockerVolumes: document.getElementById("docker-volumes"),
+      dockerContainers: document.getElementById("docker-containers"),
+      dockerBuildCache: document.getElementById("docker-build-cache"),
+      body: document.getElementById("container-body"),
+      emptyState: document.getElementById("empty-state"),
+      filterInput: document.getElementById("filter-input")
+    };
+
+    function formatBytes(value) {
+      const bytes = Number(value || 0);
+      if (!Number.isFinite(bytes) || bytes <= 0) {
+        return "0 B";
+      }
+      const units = ["B", "KB", "MB", "GB", "TB", "PB"];
+      const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+      const amount = bytes / (1024 ** exponent);
+      return `${amount >= 100 ? amount.toFixed(0) : amount.toFixed(amount >= 10 ? 1 : 2)} ${units[exponent]}`;
+    }
+
+    function formatPercent(value) {
+      const number = Number(value || 0);
+      return `${number.toFixed(1)}%`;
+    }
+
+    function formatDate(iso) {
+      if (!iso) return "--";
+      const date = new Date(iso);
+      if (Number.isNaN(date.getTime())) return "--";
+      return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+
+    function formatRelativeTime(iso) {
+      if (!iso) return "--";
+      const start = new Date(iso);
+      if (Number.isNaN(start.getTime())) return "--";
+      const totalSeconds = Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      if (days > 0) return `${days}d ${hours}h`;
+      if (hours > 0) return `${hours}h ${minutes}m`;
+      return `${minutes}m`;
+    }
+
+    function statusClass(status) {
+      switch ((status || "").toLowerCase()) {
+        case "running":
+          return "running";
+        case "paused":
+          return "paused";
+        case "exited":
+          return "exited";
+        case "created":
+          return "created";
+        default:
+          return "unknown";
+      }
+    }
+
+    function primaryDisk(host) {
+      const disks = Array.isArray(host?.disk) ? host.disk : [];
+      if (!disks.length) return null;
+      return disks.find((disk) => disk.mount === "/") || disks.slice().sort((a, b) => b.total_bytes - a.total_bytes)[0];
+    }
+
+    function updateOverview(snapshot) {
+      const host = snapshot.host || {};
+      const cpu = host.cpu || {};
+      const memory = host.memory || {};
+      const load = host.load || {};
+      const disk = primaryDisk(host);
+
+      els.lastUpdated.textContent = `Last: ${formatDate(snapshot.last_updated)}`;
+
+      els.cpuValue.textContent = formatPercent(cpu.usage_percent || 0);
+      els.cpuSub.textContent = `${cpu.core_count || 0} cores`;
+      els.cpuBar.style.width = `${Math.max(0, Math.min(100, cpu.usage_percent || 0))}%`;
+
+      els.memoryValue.textContent = formatPercent(memory.usage_percent || 0);
+      els.memorySub.textContent = `${formatBytes(memory.used_bytes)} / ${formatBytes(memory.total_bytes)}`;
+      els.memoryBar.style.width = `${Math.max(0, Math.min(100, memory.usage_percent || 0))}%`;
+
+      els.diskValue.textContent = disk ? formatPercent(disk.usage_percent || 0) : "--";
+      els.diskSub.textContent = disk ? `${formatBytes(disk.used_bytes)} / ${formatBytes(disk.total_bytes)} on ${disk.mount}` : "No disk data";
+      els.diskBar.style.width = `${Math.max(0, Math.min(100, disk?.usage_percent || 0))}%`;
+
+      const loadRatio = cpu.core_count ? Math.min((load.load_1m || 0) / cpu.core_count * 100, 100) : 0;
+      els.loadValue.textContent = load.load_1m != null ? Number(load.load_1m).toFixed(2) : "--";
+      els.loadSub.textContent = `5m ${Number(load.load_5m || 0).toFixed(2)}  15m ${Number(load.load_15m || 0).toFixed(2)}`;
+      els.loadBar.style.width = `${Math.max(0, Math.min(100, loadRatio))}%`;
+
+      const dockerDisk = snapshot.docker_disk || {};
+      els.dockerTotal.textContent = `${formatBytes(dockerDisk.total_bytes || 0)} total`;
+      els.dockerImages.textContent = `Images: ${formatBytes(dockerDisk.images_bytes || 0)}`;
+      els.dockerVolumes.textContent = `Volumes: ${formatBytes(dockerDisk.volumes_bytes || 0)}`;
+      els.dockerContainers.textContent = `Containers: ${formatBytes(dockerDisk.containers_bytes || 0)}`;
+      els.dockerBuildCache.textContent = `Build cache: ${formatBytes(dockerDisk.build_cache_bytes || 0)}`;
+    }
+
+    function sortValue(container, key) {
+      switch (key) {
+        case "name":
+          return (container.coolify?.name || container.name || "").toLowerCase();
+        case "status":
+          return (container.status || "").toLowerCase();
+        case "cpu":
+          return Number(container.cpu_percent || 0);
+        case "memory":
+          return Number(container.memory_percent || 0);
+        case "disk":
+          return Number(container.disk_rw_bytes || 0);
+        case "fqdn":
+          return (container.coolify?.fqdn || "").toLowerCase();
+        case "uptime":
+          return container.started_at ? new Date(container.started_at).getTime() : 0;
+        default:
+          return 0;
+      }
+    }
+
+    function matchesFilter(container, filter) {
+      if (!filter) return true;
+      const haystack = [
+        container.name,
+        container.coolify?.name,
+        container.coolify?.project,
+        container.coolify?.environment,
+        container.coolify?.fqdn
+      ].filter(Boolean).join(" ").toLowerCase();
+      return haystack.includes(filter);
+    }
+
+    function renderContainers(snapshot) {
+      const containers = Object.values(snapshot.containers || {});
+      const filter = state.filter.trim().toLowerCase();
+      const filtered = containers.filter((container) => matchesFilter(container, filter));
+
+      filtered.sort((a, b) => {
+        const aValue = sortValue(a, state.sortKey);
+        const bValue = sortValue(b, state.sortKey);
+        let result = 0;
+        if (typeof aValue === "string" || typeof bValue === "string") {
+          result = String(aValue).localeCompare(String(bValue));
+        } else {
+          result = Number(aValue) - Number(bValue);
+        }
+        return state.sortDirection === "asc" ? result : -result;
+      });
+
+      if (!filtered.length) {
+        els.body.innerHTML = "";
+        els.emptyState.hidden = false;
+        return;
+      }
+
+      els.emptyState.hidden = true;
+      els.body.innerHTML = filtered.map((container) => {
+        const coolify = container.coolify || {};
+        const displayName = coolify.name || container.name;
+        const sublineParts = [coolify.project, coolify.environment].filter(Boolean);
+        const fqdn = coolify.fqdn;
+        const cpuWidth = Math.max(0, Math.min(100, Number(container.cpu_percent || 0)));
+        const memoryWidth = Math.max(0, Math.min(100, Number(container.memory_percent || 0)));
+        const health = coolify.health_check ? `<span class="badge">${coolify.status || "health enabled"}</span>` : "";
+        return `
+          <tr>
+            <td>
+              <div class="name-cell">
+                <div class="name-main">${escapeHtml(displayName)} ${health}</div>
+                <div class="name-sub">${escapeHtml(sublineParts.join(" / ") || container.name)}</div>
+              </div>
+            </td>
+            <td>
+              <span class="status"><span class="dot ${statusClass(container.status)}"></span>${escapeHtml(container.status || "unknown")}</span>
+            </td>
+            <td>
+              <div class="mini-metric">
+                <div class="mini-label"><span>${formatPercent(container.cpu_percent || 0)}</span><span>${formatBytes(container.net_rx_bytes_per_sec || 0)}/s in</span></div>
+                <div class="bar"><span style="width:${cpuWidth}%"></span></div>
+              </div>
+            </td>
+            <td>
+              <div class="mini-metric">
+                <div class="mini-label"><span>${formatBytes(container.memory_usage_bytes || 0)} / ${formatBytes(container.memory_limit_bytes || 0)}</span><span>${formatPercent(container.memory_percent || 0)}</span></div>
+                <div class="bar"><span style="width:${memoryWidth}%"></span></div>
+              </div>
+            </td>
+            <td>${formatBytes(container.disk_rw_bytes || 0)}</td>
+            <td>${fqdn ? `<a class="link" href="${escapeAttribute(fqdn)}" target="_blank" rel="noreferrer">${escapeHtml(fqdn.replace(/^https?:\/\//, ""))}</a>` : "—"}</td>
+            <td>${formatRelativeTime(container.started_at)}</td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function escapeAttribute(value) {
+      return escapeHtml(value);
+    }
+
+    function updateDashboard(snapshot) {
+      state.snapshot = snapshot;
+      updateOverview(snapshot);
+      renderContainers(snapshot);
+    }
+
+    function connectStream() {
+      const source = new EventSource("/api/stream");
+      source.onopen = () => {
+        els.connectionState.textContent = "Live";
+      };
+      source.onmessage = (event) => {
+        const snapshot = JSON.parse(event.data);
+        updateDashboard(snapshot);
+      };
+      source.onerror = () => {
+        els.connectionState.textContent = "Reconnecting…";
+      };
+    }
+
+    els.filterInput.addEventListener("input", (event) => {
+      state.filter = event.target.value;
+      if (state.snapshot) {
+        renderContainers(state.snapshot);
+      }
+    });
+
+    document.querySelectorAll("th[data-sort]").forEach((header) => {
+      header.addEventListener("click", () => {
+        const nextKey = header.dataset.sort;
+        if (state.sortKey === nextKey) {
+          state.sortDirection = state.sortDirection === "asc" ? "desc" : "asc";
+        } else {
+          state.sortKey = nextKey;
+          state.sortDirection = nextKey === "name" || nextKey === "status" || nextKey === "fqdn" ? "asc" : "desc";
+        }
+        if (state.snapshot) {
+          renderContainers(state.snapshot);
+        }
+      });
+    });
+
+    connectStream();
+  </script>
+</body>
+</html>

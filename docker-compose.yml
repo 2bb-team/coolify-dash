@@ -1,0 +1,17 @@
+services:
+  coolify-monitor:
+    build: .
+    container_name: coolify-monitor
+    ports:
+      - "9100:9100"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+    environment:
+      - COOLIFY_API_URL=http://host.docker.internal:8000
+      - COOLIFY_API_TOKEN=${COOLIFY_API_TOKEN}
+    restart: unless-stopped
+    mem_limit: 128m
+    cpus: 0.25
