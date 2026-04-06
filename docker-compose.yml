@@ -12,6 +12,16 @@ services:
     environment:
       - COOLIFY_API_URL=http://host.docker.internal:8000
       - COOLIFY_API_TOKEN=${COOLIFY_API_TOKEN}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9100/api/health', timeout=5).read()"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
     mem_limit: 128m
     cpus: 0.25

@@ -20,6 +20,8 @@ async def cors_middleware(request: web.Request, handler):
 @web.middleware
 async def basic_auth_middleware(request: web.Request, handler):
     config = request.app["config"]
+    if request.path == "/api/health":
+        return await handler(request)
     if not config.basic_auth_enabled:
         return await handler(request)
 

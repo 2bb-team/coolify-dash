@@ -7,6 +7,10 @@ from pathlib import Path
 from aiohttp import web
 
 
+async def health_handler(request: web.Request) -> web.Response:
+    return web.json_response({"status": "ok"})
+
+
 async def metrics_handler(request: web.Request) -> web.Response:
     snapshot = await request.app["store"].get_snapshot()
     return web.json_response(snapshot)
@@ -58,6 +62,7 @@ async def static_handler(request: web.Request) -> web.StreamResponse:
 
 
 def setup_routes(app: web.Application) -> None:
+    app.router.add_get("/api/health", health_handler)
     app.router.add_get("/api/metrics", metrics_handler)
     app.router.add_get("/api/stream", sse_handler)
     app.router.add_get("/", index_handler)
