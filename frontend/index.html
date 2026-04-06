@@ -326,6 +326,32 @@
       text-decoration-color: rgba(214, 138, 23, 0.45);
     }
 
+    .group-row td {
+      padding: 18px 12px 10px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .group-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .group-title {
+      font-size: 0.82rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .group-count {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
     .empty {
       color: var(--muted);
       padding: 20px 8px 6px;
@@ -648,6 +674,88 @@
       els.errorFooter.hidden = false;
     }
 
+    function isCoolifySystemContainer(container) {
+      const values = [
+        container.name,
+        container.display_name,
+        container.image,
+        container.coolify_container_name,
+        container.coolify_app_name
+      ].filter(Boolean).join(" ").toLowerCase();
+
+      if (!values.includes("coolify")) {
+        return false;
+      }
+
+      if ((container.coolify?.project || container.coolify_project_name)) {
+        return false;
+      }
+
+      return true;
+    }
+
+    function groupLabel(container) {
+      const project = container.coolify?.project || container.coolify_project_name;
+      if (project) {
+        return project;
+      }
+      if (isCoolifySystemContainer(container)) {
+        return "Coolify System";
+      }
+      return "Ungrouped";
+    }
+
+    function groupRank(groupName) {
+      if (groupName === "Coolify System") {
+        return 0;
+      }
+      if (groupName === "Ungrouped") {
+        return 2;
+      }
+      return 1;
+    }
+
+    function renderContainerRow(container) {
+      const coolify = container.coolify || {};
+      const displayName = coolify.name || container.display_name || container.coolify_container_name || container.coolify_app_name || container.name;
+      const sublineParts = [
+        coolify.project || container.coolify_project_name,
+        coolify.environment || container.coolify_environment_name
+      ].filter(Boolean);
+      const fqdn = coolify.fqdn;
+      const cpuWidth = Math.max(0, Math.min(100, Number(container.cpu_percent || 0)));
+      const memoryWidth = Math.max(0, Math.min(100, Number(container.memory_percent || 0)));
+      const health = coolify.health_check ? `<span class="badge">${coolify.status || "health enabled"}</span>` : "";
+      return `
+        <tr>
+          <td>
+            <div class="name-cell">
+              <div class="name-main">${escapeHtml(displayName)} ${health}</div>
+              <div class="name-sub">${escapeHtml(sublineParts.join(" / ") || container.name)}</div>
+            </div>
+          </td>
+          <td>
+            <span class="status"><span class="dot ${statusClass(container.status)}"></span>${escapeHtml(container.status || "unknown")}</span>
+          </td>
+          <td>
+            <div class="mini-metric">
+              <div class="mini-label"><span>${formatPercent(container.cpu_percent || 0)}</span><span>${formatBytes(container.net_rx_bytes_per_sec || 0)}/s in</span></div>
+              <div class="bar"><span style="width:${cpuWidth}%"></span></div>
+            </div>
+          </td>
+          <td>
+            <div class="mini-metric">
+              <div class="mini-label"><span>${formatBytes(container.memory_usage_bytes || 0)} / ${formatBytes(container.memory_limit_bytes || 0)}</span><span>${formatPercent(container.memory_percent || 0)}</span></div>
+              <div class="bar"><span style="width:${memoryWidth}%"></span></div>
+            </div>
+          </td>
+          <td>${formatBytes(container.disk_rw_bytes || 0)}</td>
+          <td>${fqdn ? `<a class="link" href="${escapeAttribute(fqdn)}" target="_blank" rel="noreferrer">${escapeHtml(fqdn.replace(/^https?:\/\//, ""))}</a>` : "—"}</td>
+          <td>${formatRelativeTime(container.started_at)}</td>
+        </tr>
+      `;
+    }
+
     function renderContainers(snapshot) {
       const containers = Object.values(snapshot.containers || {});
       const filter = state.filter.trim().toLowerCase();
@@ -675,45 +783,35 @@
       }
 
       els.emptyState.hidden = true;
-      els.body.innerHTML = filtered.map((container) => {
-        const coolify = container.coolify || {};
-        const displayName = coolify.name || container.display_name || container.coolify_container_name || container.coolify_app_name || container.name;
-        const sublineParts = [
-          coolify.project || container.coolify_project_name,
-          coolify.environment || container.coolify_environment_name
-        ].filter(Boolean);
-        const fqdn = coolify.fqdn;
-        const cpuWidth = Math.max(0, Math.min(100, Number(container.cpu_percent || 0)));
-        const memoryWidth = Math.max(0, Math.min(100, Number(container.memory_percent || 0)));
-        const health = coolify.health_check ? `<span class="badge">${coolify.status || "health enabled"}</span>` : "";
-        return `
-          <tr>
-            <td>
-              <div class="name-cell">
-                <div class="name-main">${escapeHtml(displayName)} ${health}</div>
-                <div class="name-sub">${escapeHtml(sublineParts.join(" / ") || container.name)}</div>
+      const groups = new Map();
+      for (const container of filtered) {
+        const label = groupLabel(container);
+        if (!groups.has(label)) {
+          groups.set(label, []);
+        }
+        groups.get(label).push(container);
+      }
+
+      const orderedGroups = Array.from(groups.entries()).sort((a, b) => {
+        const rankDelta = groupRank(a[0]) - groupRank(b[0]);
+        if (rankDelta !== 0) {
+          return rankDelta;
+        }
+        return a[0].localeCompare(b[0]);
+      });
+
+      els.body.innerHTML = orderedGroups.map(([label, items]) => {
+        const groupHeader = `
+          <tr class="group-row">
+            <td colspan="7">
+              <div class="group-header">
+                <span class="group-title">${escapeHtml(label)}</span>
+                <span class="group-count">${items.length} container${items.length === 1 ? "" : "s"}</span>
               </div>
             </td>
-            <td>
-              <span class="status"><span class="dot ${statusClass(container.status)}"></span>${escapeHtml(container.status || "unknown")}</span>
-            </td>
-            <td>
-              <div class="mini-metric">
-                <div class="mini-label"><span>${formatPercent(container.cpu_percent || 0)}</span><span>${formatBytes(container.net_rx_bytes_per_sec || 0)}/s in</span></div>
-                <div class="bar"><span style="width:${cpuWidth}%"></span></div>
-              </div>
-            </td>
-            <td>
-              <div class="mini-metric">
-                <div class="mini-label"><span>${formatBytes(container.memory_usage_bytes || 0)} / ${formatBytes(container.memory_limit_bytes || 0)}</span><span>${formatPercent(container.memory_percent || 0)}</span></div>
-                <div class="bar"><span style="width:${memoryWidth}%"></span></div>
-              </div>
-            </td>
-            <td>${formatBytes(container.disk_rw_bytes || 0)}</td>
-            <td>${fqdn ? `<a class="link" href="${escapeAttribute(fqdn)}" target="_blank" rel="noreferrer">${escapeHtml(fqdn.replace(/^https?:\/\//, ""))}</a>` : "—"}</td>
-            <td>${formatRelativeTime(container.started_at)}</td>
           </tr>
         `;
+        return groupHeader + items.map((container) => renderContainerRow(container)).join("");
       }).join("");
     }
 
