@@ -68,7 +68,7 @@ class DockerStatsCollector:
         attrs = container.attrs
         state = attrs.get("State", {}) or {}
         config = attrs.get("Config", {}) or {}
-        image_name = (container.image.tags or [config.get("Image", "")])[0]
+        image_name = config.get("Image", "")
 
         info: dict[str, Any] = {
             "id": container.short_id,

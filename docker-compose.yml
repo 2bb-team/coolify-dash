@@ -4,6 +4,8 @@ services:
     container_name: coolify-monitor
     ports:
       - "9100:9100"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /proc:/host/proc:ro

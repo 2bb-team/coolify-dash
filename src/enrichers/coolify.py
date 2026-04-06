@@ -36,8 +36,14 @@ class CoolifyEnricher:
             "Authorization": f"Bearer {self.config.coolify_api_token}",
             "Accept": "application/json",
         }
-        async with ClientSession(headers=headers, timeout=timeout) as session:
-            resources = await self._build_resource_map(session)
+        try:
+            async with ClientSession(headers=headers, timeout=timeout) as session:
+                resources = await self._build_resource_map(session)
+        except Exception as exc:
+            LOGGER.warning("Coolify API unavailable at %s: %s", self.config.coolify_api_url, exc)
+            if self._cache:
+                await self.store.update_coolify(self._cache)
+            return
 
         self._cache = resources
         await self.store.update_coolify(resources)
@@ -49,24 +55,31 @@ class CoolifyEnricher:
             return await response.json()
 
     async def _build_resource_map(self, session: ClientSession) -> dict[str, dict[str, Any]]:
-        applications_task = asyncio.create_task(self._api_get(session, "/applications"))
-        services_task = asyncio.create_task(self._api_get(session, "/services"))
-        projects = await self._api_get(session, "/projects")
+        results = await asyncio.gather(
+            self._api_get(session, "/applications"),
+            self._api_get(session, "/services"),
+            self._api_get(session, "/projects"),
+            return_exceptions=True,
+        )
+        applications, services, projects = results
+        failures = [result for result in results if isinstance(result, Exception)]
+        if failures:
+            raise failures[0]
 
         environment_lookup: dict[int, dict[str, Any]] = {}
-        env_tasks = [
-            asyncio.create_task(self._fetch_project_environments(session, project))
-            for project in projects
-            if project.get("uuid")
-        ]
-        for task in env_tasks:
-            try:
-                environment_lookup.update(await task)
-            except Exception as exc:
-                LOGGER.warning("Project environment lookup failed: %s", exc)
-
-        applications = await applications_task
-        services = await services_task
+        env_results = await asyncio.gather(
+            *[
+                self._fetch_project_environments(session, project)
+                for project in projects
+                if project.get("uuid")
+            ],
+            return_exceptions=True,
+        )
+        for result in env_results:
+            if isinstance(result, Exception):
+                LOGGER.warning("Project environment lookup failed: %s", result)
+                continue
+            environment_lookup.update(result)
 
         resources: dict[str, dict[str, Any]] = {}
         for application in applications:
