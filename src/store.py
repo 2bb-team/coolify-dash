@@ -55,19 +55,20 @@ class MetricStore:
     def _match_container_to_coolify(self, container: dict[str, Any]) -> dict[str, Any] | None:
         labels = container.get("labels", {}) or {}
         name = container.get("name", "")
+        explicit_uuid = container.get("coolify_resource_uuid")
 
-        explicit_uuid = None
-        for key in (
-            "coolify.uuid",
-            "coolify.resourceUuid",
-            "coolify.resource_uuid",
-            "coolify.applicationId",
-            "coolify.serviceId",
-        ):
-            value = labels.get(key)
-            if value and value in self.coolify_map:
-                explicit_uuid = value
-                break
+        if not explicit_uuid:
+            for key in (
+                "coolify.uuid",
+                "coolify.resourceUuid",
+                "coolify.resource_uuid",
+                "coolify.applicationId",
+                "coolify.serviceId",
+            ):
+                value = labels.get(key)
+                if value and value in self.coolify_map:
+                    explicit_uuid = value
+                    break
 
         if explicit_uuid:
             return {"uuid": explicit_uuid, **self.coolify_map[explicit_uuid]}
@@ -98,6 +99,12 @@ class MetricStore:
                     merged["volumes"] = disk_data.get("volumes", [])
                 coolify = self._match_container_to_coolify(container_data)
                 if coolify:
+                    if not coolify.get("name"):
+                        coolify["name"] = merged.get("coolify_app_name") or merged.get("display_name")
+                    if not coolify.get("project"):
+                        coolify["project"] = merged.get("coolify_project_name")
+                    if not coolify.get("environment"):
+                        coolify["environment"] = merged.get("coolify_environment_name")
                     merged["coolify"] = coolify
                 enriched[container_id] = merged
 

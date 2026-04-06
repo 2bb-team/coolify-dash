@@ -597,7 +597,7 @@
     function sortValue(container, key) {
       switch (key) {
         case "name":
-          return (container.name || container.coolify?.name || "").toLowerCase();
+          return (container.display_name || container.coolify?.name || container.name || "").toLowerCase();
         case "status":
           return (container.status || "").toLowerCase();
         case "cpu":
@@ -618,7 +618,12 @@
     function matchesFilter(container, filter) {
       if (!filter) return true;
       const haystack = [
+        container.display_name,
         container.name,
+        container.coolify_container_name,
+        container.coolify_app_name,
+        container.coolify_project_name,
+        container.coolify_environment_name,
         container.coolify?.name,
         container.coolify?.project,
         container.coolify?.environment,
@@ -672,8 +677,11 @@
       els.emptyState.hidden = true;
       els.body.innerHTML = filtered.map((container) => {
         const coolify = container.coolify || {};
-        const displayName = coolify.name || container.name;
-        const sublineParts = [coolify.project, coolify.environment].filter(Boolean);
+        const displayName = coolify.name || container.display_name || container.coolify_container_name || container.coolify_app_name || container.name;
+        const sublineParts = [
+          coolify.project || container.coolify_project_name,
+          coolify.environment || container.coolify_environment_name
+        ].filter(Boolean);
         const fqdn = coolify.fqdn;
         const cpuWidth = Math.max(0, Math.min(100, Number(container.cpu_percent || 0)));
         const memoryWidth = Math.max(0, Math.min(100, Number(container.memory_percent || 0)));

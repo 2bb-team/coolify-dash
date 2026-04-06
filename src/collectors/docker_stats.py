@@ -19,6 +19,16 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _env_list_to_map(items: list[str]) -> dict[str, str]:
+    result: dict[str, str] = {}
+    for item in items:
+        if "=" not in item:
+            continue
+        key, value = item.split("=", 1)
+        result[key] = value
+    return result
+
+
 class DockerStatsCollector:
     def __init__(self, store: MetricStore, config: Config) -> None:
         self.store = store
@@ -68,16 +78,39 @@ class DockerStatsCollector:
         attrs = container.attrs
         state = attrs.get("State", {}) or {}
         config = attrs.get("Config", {}) or {}
+        env_map = _env_list_to_map(config.get("Env", []) or [])
+        labels = container.labels or {}
         image_name = config.get("Image", "")
+        display_name = (
+            env_map.get("COOLIFY_CONTAINER_NAME")
+            or env_map.get("COOLIFY_APP_NAME")
+            or labels.get("com.docker.compose.service")
+            or labels.get("coolify.name")
+            or container.name
+        )
+        project_name = env_map.get("COOLIFY_PROJECT_NAME") or labels.get("coolify.projectName")
+        environment_name = env_map.get("COOLIFY_ENVIRONMENT_NAME") or labels.get("coolify.environmentName")
 
         info: dict[str, Any] = {
             "id": container.short_id,
             "name": container.name,
+            "display_name": display_name,
             "image": image_name,
             "status": container.status,
             "state_started_at": state.get("StartedAt"),
             "started_at": state.get("StartedAt"),
-            "labels": container.labels or {},
+            "labels": labels,
+            "coolify_app_name": env_map.get("COOLIFY_APP_NAME"),
+            "coolify_container_name": env_map.get("COOLIFY_CONTAINER_NAME"),
+            "coolify_project_name": project_name,
+            "coolify_environment_name": environment_name,
+            "coolify_resource_uuid": (
+                env_map.get("COOLIFY_RESOURCE_UUID")
+                or env_map.get("COOLIFY_UUID")
+                or labels.get("coolify.uuid")
+                or labels.get("coolify.resourceUuid")
+                or labels.get("coolify.resource_uuid")
+            ),
             "created_at": attrs.get("Created"),
             "collected_at": _now_iso(),
             "cpu_percent": 0.0,
