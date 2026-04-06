@@ -17,6 +17,13 @@ class MetricStore:
         self.container_disk: dict[str, dict[str, Any]] = {}
         self.docker_disk: dict[str, Any] = {}
         self.coolify_map: dict[str, dict[str, Any]] = {}
+        self.coolify_status: dict[str, Any] = {
+            "enabled": False,
+            "reachable": None,
+            "api_url": "",
+            "last_success": "",
+            "last_error": "",
+        }
         self.last_updated: str = ""
 
     async def update_host(self, data: dict[str, Any]) -> None:
@@ -38,6 +45,11 @@ class MetricStore:
     async def update_coolify(self, data: dict[str, dict[str, Any]]) -> None:
         async with self._lock:
             self.coolify_map = data
+            self.last_updated = _now_iso()
+
+    async def update_coolify_status(self, data: dict[str, Any]) -> None:
+        async with self._lock:
+            self.coolify_status = {**self.coolify_status, **data}
             self.last_updated = _now_iso()
 
     def _match_container_to_coolify(self, container: dict[str, Any]) -> dict[str, Any] | None:
@@ -93,5 +105,6 @@ class MetricStore:
                 "host": self.host,
                 "containers": enriched,
                 "docker_disk": self.docker_disk,
+                "coolify_status": self.coolify_status,
                 "last_updated": self.last_updated,
             }

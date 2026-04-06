@@ -331,6 +331,16 @@
       padding: 20px 8px 6px;
     }
 
+    .error-footer {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(202, 68, 50, 0.24);
+      background: rgba(202, 68, 50, 0.08);
+      color: var(--bad);
+      font-size: 0.92rem;
+    }
+
     .pulse {
       display: inline-flex;
       width: 10px;
@@ -455,14 +465,16 @@
       </div>
       <div id="empty-state" class="empty" hidden>No containers match the current filter.</div>
     </section>
+
+    <footer id="error-footer" class="error-footer" hidden></footer>
   </main>
 
   <script>
     const state = {
       snapshot: null,
       filter: "",
-      sortKey: "cpu",
-      sortDirection: "desc"
+      sortKey: "name",
+      sortDirection: "asc"
     };
 
     const els = {
@@ -487,7 +499,8 @@
       dockerBuildCache: document.getElementById("docker-build-cache"),
       body: document.getElementById("container-body"),
       emptyState: document.getElementById("empty-state"),
-      filterInput: document.getElementById("filter-input")
+      filterInput: document.getElementById("filter-input"),
+      errorFooter: document.getElementById("error-footer")
     };
 
     function formatBytes(value) {
@@ -584,7 +597,7 @@
     function sortValue(container, key) {
       switch (key) {
         case "name":
-          return (container.coolify?.name || container.name || "").toLowerCase();
+          return (container.name || container.coolify?.name || "").toLowerCase();
         case "status":
           return (container.status || "").toLowerCase();
         case "cpu":
@@ -614,6 +627,22 @@
       return haystack.includes(filter);
     }
 
+    function updateFooter(snapshot) {
+      const status = snapshot.coolify_status || {};
+      if (!status.enabled || status.reachable !== false) {
+        els.errorFooter.hidden = true;
+        els.errorFooter.textContent = "";
+        return;
+      }
+
+      const parts = [`Coolify API unavailable at ${status.api_url || "configured endpoint"}.`];
+      if (status.last_error) {
+        parts.push(status.last_error);
+      }
+      els.errorFooter.textContent = parts.join(" ");
+      els.errorFooter.hidden = false;
+    }
+
     function renderContainers(snapshot) {
       const containers = Object.values(snapshot.containers || {});
       const filter = state.filter.trim().toLowerCase();
@@ -627,6 +656,9 @@
           result = String(aValue).localeCompare(String(bValue));
         } else {
           result = Number(aValue) - Number(bValue);
+        }
+        if (result === 0) {
+          result = sortValue(a, "name").localeCompare(sortValue(b, "name"));
         }
         return state.sortDirection === "asc" ? result : -result;
       });
@@ -693,6 +725,7 @@
     function updateDashboard(snapshot) {
       state.snapshot = snapshot;
       updateOverview(snapshot);
+      updateFooter(snapshot);
       renderContainers(snapshot);
     }
 

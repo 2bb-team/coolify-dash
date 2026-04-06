@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from aiohttp import ClientSession, ClientTimeout
@@ -10,6 +11,10 @@ from src.config import Config
 from src.store import MetricStore
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 class CoolifyEnricher:
@@ -29,6 +34,14 @@ class CoolifyEnricher:
 
     async def collect(self) -> None:
         if not self.config.coolify_api_token:
+            await self.store.update_coolify_status(
+                {
+                    "enabled": False,
+                    "reachable": None,
+                    "api_url": self.config.coolify_api_url,
+                    "last_error": "",
+                }
+            )
             return
 
         timeout = ClientTimeout(total=20)
@@ -41,12 +54,29 @@ class CoolifyEnricher:
                 resources = await self._build_resource_map(session)
         except Exception as exc:
             LOGGER.warning("Coolify API unavailable at %s: %s", self.config.coolify_api_url, exc)
+            await self.store.update_coolify_status(
+                {
+                    "enabled": True,
+                    "reachable": False,
+                    "api_url": self.config.coolify_api_url,
+                    "last_error": str(exc),
+                }
+            )
             if self._cache:
                 await self.store.update_coolify(self._cache)
             return
 
         self._cache = resources
         await self.store.update_coolify(resources)
+        await self.store.update_coolify_status(
+            {
+                "enabled": True,
+                "reachable": True,
+                "api_url": self.config.coolify_api_url,
+                "last_success": _now_iso(),
+                "last_error": "",
+            }
+        )
 
     async def _api_get(self, session: ClientSession, path: str) -> Any:
         url = f"{self.config.coolify_api_url}/api/v1{path}"
